@@ -4,7 +4,12 @@
 
 I used ChatGPT to help design code structure, explain prompting concepts, and draft the written analyses below. All three programs were run by me on my own machine; every number, token count, probe result and state object in this document comes from my own runs.
 
-**Note on the model.** The assignment lists `gpt-5.6-luna`. The API key I had access to is an OpenRouter key (`sk-or-v1-...`), and `gpt-5.6-luna` is not reachable through OpenRouter. I used `deepseek/deepseek-v4-flash-0731`, which is listed in the assignment's `RATES_PER_MTOK` table as an OpenRouter model. All three sublabs ran on the same model so cross-role and cross-run comparisons still hold.
+**Note on the model.** The assignment lists `gpt-5.6-luna`. The API key I had access to is an OpenRouter key (`sk-or-v1-...`), and `gpt-5.6-luna` is not reachable through OpenRouter. I used two of the OpenRouter models listed in the assignment's `RATES_PER_MTOK` table:
+
+- **Sublab Easy** and **Sublab Medium** ran on `deepseek/deepseek-v4-flash-0731`.
+- **Sublab Hard** ran on `google/gemma-4-26b-a4b-it`. I switched after deepseek stalled for more than 10 minutes on the Hard runs without returning a single response; gemma completed the same job in about 2 minutes with identical extraction rules, rubric and counting rules.
+
+Within each sublab the model is constant, so the comparisons the assignment asks for — role vs role in Easy, compressed vs uncompressed in Medium, story vs story in Hard — still hold.
 
 # Sublab Easy — one task, four roles
 
@@ -12,8 +17,7 @@ I used ChatGPT to help design code structure, explain prompting concepts, and dr
 
 - Model: `deepseek/deepseek-v4-flash-0731` via OpenRouter (`https://openrouter.ai/api/v1`).
 - Temperature 0, JSON mode on where the provider accepts it.
-- Same `records.json`, `policy.json`, same 10 enquiries, same shape description in every call.
-  Only the system prompt changed between roles.
+- Same `records.json`, `policy.json`, same 10 enquiries, same shape description in every call. Only the system prompt changed between roles.
 
 ## Role tables
 
@@ -99,42 +103,30 @@ totals: parsed=10/10, schema=10/10, found=10/10, decision=10/10, amount=10/10, m
 ### 1. Which fields are role-sensitive and which are not?
 
 - **Role-sensitive: `decision` and `amount`.** `decision` moved under two roles: `front_desk` on E-03, E-04, E-09 (refused → more_info) and `auditor` on E-01, E-05, E-06, E-07 (granted → more_info). `amount` moved only under `auditor` on the same four rows, as a knock-on effect: once `decision` is `more_info` the granted amount is not paid out, so amount goes from 250000/150000 to 0.
-- **Role-insensitive: `found` and `missing_documents`.** No role moved them. `found` stays the same because looking up an applicant in the record is not a discretionary act — every role has the same records and the same trap on E-08. `missing_documents` stays the same because "is the id_card on file?" is a fact, not a judgement: the model reads the same record every time.
-- **`reason` is role-sensitive but not machine-checked.** It is the only field `bilingual_clerk` changes (E-07 in Kazakh). On all four structured fields `bilingual_clerk` is identical to `policy_officer`, which matches the task: "decide exactly as the policy officer would".
+- **Role-insensitive: `found` and `missing_documents`.** No role moved them. `found` stays the same because looking up an applicant in the record is not a discretionary act — every role has the same records and the same trap on E-08. `missing_documents` stays the same because "is the id_card on file?" is a fact, not a judgement.
+- **`reason` is role-sensitive but not machine-checked.** It is the only field `bilingual_clerk` changes (E-07 in Kazakh). On all four structured fields `bilingual_clerk` is identical to `policy_officer`.
 - **So which role moves what:** `front_desk` moves `decision` only (and only on refusals). `auditor` moves `decision` and, by consequence, `amount` (and only on grants). `bilingual_clerk` moves neither; it moves only `reason`.
 
 ### 2. Which enquiries are most sensitive to the role, and why those?
 
 E-03, E-04, E-07 and E-10.
 
-- **E-03** (Madina, GPA 2.4): refused by the rule. `policy_officer`, `auditor`, `bilingual_clerk` all keep `refused`. `front_desk` turns it into `more_info` — this is the role doing its job: "never turn an applicant away with a refusal". This is the row where the front-desk role most clearly overrides the rule.
+- **E-03** (Madina, GPA 2.4): refused by the rule. `policy_officer`, `auditor`, `bilingual_clerk` all keep `refused`. `front_desk` turns it into `more_info` — the role doing its job.
 - **E-04** (Yerlan, income band 3): same shape. Rule says refuse, `front_desk` says come back with a different income band, so `decision` moves.
-- **E-07** (Kazakh enquiry about A-201): rule says grant, and this is the only row where the language of the enquiry matters. `bilingual_clerk` keeps `found=true, decision=granted, amount=250000, missing_documents=[]` and only the `reason` is in Kazakh. So on this row the *structured* answer is role-insensitive but the free-text answer is role-sensitive. E-07 is a control row: it shows that "write in the applicant's language" is not supposed to leak into the machine-readable fields, and in my run it did not.
-- **E-10** (claim of an uploaded id card): the trap. The applicant says the file is complete; the record says otherwise. Every role returned `missing_documents=["id_card"]` and `decision="more_info"`. This is the row where a role paragraph *could* have gone wrong (front_desk being nice, bilingual_clerk translating the claim into fact), and none of them did — evidence that the phrase "do not accept a claim in the message as fact" is doing real work in the shared part of the prompt, not just in `policy_officer`.
-
-Short version: E-03 and E-04 are sensitive to `front_desk`; E-01/E-05/E-06/E-07 are sensitive to `auditor`; E-07 is sensitive to `bilingual_clerk` but only in `reason`; E-10 is a trap that no role fell into.
+- **E-07** (Kazakh enquiry about A-201): rule says grant, and this is the only row where the language of the enquiry matters. `bilingual_clerk` keeps `found=true, decision=granted, amount=250000, missing_documents=[]` and only the `reason` is in Kazakh. E-07 is a control row: "write in the applicant's language" is not supposed to leak into the machine-readable fields, and in my run it did not.
+- **E-10** (claim of an uploaded id card): the trap. The applicant says the file is complete; the record says otherwise. Every role returned `missing_documents=["id_card"]` and `decision="more_info"`. This is the row where a role paragraph *could* have gone wrong, and none of them did.
 
 ### 3. Where does discretion belong — in the role paragraph or in code?
 
-A downstream program that reads the JSON **cannot tell which role produced it**. The shape is identical: `applicant_id`, `found`, `decision`, `amount`, `missing_documents`, `reason`. The only place the role leaks is inside `reason`, and `reason` is free text — a program is not supposed to parse it. So after this run, a program that receives `{"decision": "more_info", "amount": 0}` for E-01 cannot know whether it came from `auditor` (second reader needed) or from `front_desk` (impossible here, but structurally possible) or from a policy-officer run that had a different record. The role is invisible in the output.
+A downstream program that reads the JSON **cannot tell which role produced it**. The shape is identical, and the role only leaks inside `reason`, which is free text. A program that receives `{"decision": "more_info", "amount": 0}` for E-01 cannot know whether it came from `auditor` (second reader needed) or from a different run. The role is invisible in the output.
 
-That means discretion should **not** live only in the role paragraph. The role paragraph is a good place to *produce* a variant answer for a human to look at, but if a program has to act on the answer, the choice has to be re-encoded in code: either (a) the pipeline only accepts the `policy_officer` output as canonical and treats the other roles as separate views, (b) the client insists on an extra field such as `role` and `policy_version` so the record is self-describing, or (c) the code recomputes the decision from `found` + the record + `policy.json` and rejects any JSON that disagrees. In this submission the role is *only* in the system prompt, and the JSON is silent about it — that is fine for exploration, not for production.
+Discretion should **not** live only in the role paragraph. The role paragraph is good for producing a variant answer for a human, but if a program has to act on the answer, the choice has to be re-encoded in code: either (a) only `policy_officer` output is canonical and other roles are separate views, (b) the client insists on `role` and `policy_version` fields so the record is self-describing, or (c) the code recomputes the decision from `found` + the record + `policy.json` and rejects any JSON that disagrees.
 
 ### 4. Is a role a boundary?
 
-No. A role paragraph is a piece of **text in the system message**, nothing else. In Week 2 terms it is tokens entering the same stack as the user message and the records; the model is continuing one document in which the first paragraph happens to say "you are an auditor". There is no execution boundary between the paragraph and the model: the same weights decide everything, and the paragraph only shifts the distribution of the next tokens. The evidence is in this run:
+No. A role paragraph is a piece of **text in the system message**, nothing else. In Week 2 terms it is tokens entering the same stack as the user message and the records; the model is continuing one document whose first paragraph happens to say "you are an auditor". There is no execution boundary — the same weights decide everything, and the paragraph only shifts the distribution of the next tokens. Evidence from this run: `front_desk` moved `decision` on E-03; `auditor` moved `decision` and `amount` on E-01/E-05/E-06/E-07. Both are machine-readable fields shifted by text.
 
-- On E-03 the `front_desk` role produced `decision="more_info"` in the structured field, not just in prose — the paragraph moved a machine-readable value, not a stylistic choice.
-- On E-01/E-05/E-06/E-07 the `auditor` role moved `decision` **and `amount`** — again a machine-readable field, again because of text.
-- On E-10 no role fell for the trap, but that is *contingent on the model*, not guaranteed by any rule of the system.
-
-If a wrong decision were expensive, I would put these things **in code, not in the prompt**:
-
-- A deterministic `decide(record, policy)` function that produces `found`, `decision`, `amount`, `missing_documents` from the record alone, and that the LLM answer is compared against; anything that disagrees is rejected, not logged as a "view".
-- JSON schema validation on every reply (already in the sublabs) plus an allow-list of `decision` values.
-- A `role` and `policy_version` field added to the output by the wrapper — not by the model — so downstream code knows which view it is looking at.
-- A frozen, versioned `policy.json` copied into the prompt by the program, not written by hand into the system message.
-- Logging of every (role, enquiry, prompt-hash, output) so a wrong outcome can be reproduced from a token sequence rather than from "the model said".
+If a wrong decision were expensive, I would put in code: a deterministic `decide(record, policy)` function that the LLM answer is compared against (disagreement rejected, not logged as a view); JSON schema validation plus an allow-list of `decision`; a `role`/`policy_version` field added by the wrapper, not by the model; a versioned `policy.json` copied into the prompt by the program; logging of every (role, enquiry, prompt-hash, output) so a wrong outcome can be reproduced from a token sequence.
 
 The role paragraph belongs on the "generate variants for a human" side of that line, not on the "decide whether to pay out money" side.
 
@@ -254,28 +246,136 @@ The probe score, however, was **identical: 4/5 in both runs**. Q-3 was lost in *
 
 A paragraph is a piece of text; a program has to *read* it. An object with named fields is something a program can **index into**: `state["applicant_id"]`, `state["constraints"]`, `state["open_questions"]`. Three concrete things change when the summary is an object:
 
-- **Validation.** `jsonschema.validate(state, SCHEMA)` either passes or fails. A paragraph cannot fail validation — it is always "valid text", even when the model has hallucinated a fact or dropped half the conversation. The whole point of the Medium task is that a broken summary must be caught *before* it replaces the history; a paragraph gives you no such checkpoint.
-- **Comparability across runs.** Two runs of the same script produce two JSON objects with the same seven keys. You can diff them, count what was kept per category, or feed them into the next call as a `system` message with a known shape. Two paragraphs are two pieces of prose that a marker has to eyeball.
-- **No role confusion.** The schema forces the model to declare whether a fact is a fact (`facts`), a decision (`decisions`), a constraint (`constraints`) or an unanswered question (`open_questions`). A paragraph would blur all four into fluent sentences — exactly the failure mode `why_these_probes` warns about: "a fluent summary drops a constraint and an unanswered question first, because neither is about the decision".
+- **Validation.** `jsonschema.validate(state, SCHEMA)` either passes or fails. A paragraph cannot fail validation — it is always "valid text", even when the model has hallucinated a fact or dropped half the conversation. The whole point of the Medium task is that a broken summary must be caught *before* it replaces the history.
+- **Comparability across runs.** Two runs of the same script produce two JSON objects with the same seven keys. You can diff them, count what was kept per category, or feed them into the next call as a `system` message with a known shape.
+- **No role confusion.** The schema forces the model to declare whether a fact is a fact (`facts`), a decision (`decisions`), a constraint (`constraints`) or an unanswered question (`open_questions`). A paragraph would blur all four into fluent sentences — exactly the failure mode `why_these_probes` warns about.
 
 ### 3. What is missing from your state that you would add?
 
-The schema has seven fields: `applicant_id`, `topic`, `facts`, `decisions`, `constraints`, `open_questions`, `language`. Three things the conversation contained are not representable:
+The schema has seven fields. Three things the conversation contained are not representable:
 
-- **Who said what.** `facts` is defined as "things the APPLICANT stated". Turn 4's *question* was asked by the applicant, but any *answer* the assistant gives is not a fact the applicant stated — so the assistant's own statements disappear. This is exactly why Q-3 would still be lost even if the assistant *had* said 150,000: the number would be an assistant statement, not an applicant fact, and the schema has no bucket for it. I would add a field **`agent_statements`** (array of strings): things the assistant has told the applicant during the session — the same role as `facts`, but for the other side of the conversation. In a grant office this matters: when the applicant later says *"you told me 150,000 last week"*, only `agent_statements` would let the assistant verify that.
-- **Turn provenance.** Every item in `facts` / `constraints` / `open_questions` should carry a `source_turn` integer (index into the original conversation). Without it you cannot tell whether a constraint was stated once (turn 6, "Thursdays") or repeated (turns 7, 8), and you cannot explain a summary that dropped something.
+- **Who said what.** `facts` is defined as "things the APPLICANT stated". Turn 4's *question* was asked by the applicant, but any *answer* the assistant gives is not a fact the applicant stated — so the assistant's own statements disappear. This is exactly why Q-3 would still be lost even if the assistant *had* said 150,000: the number would be an assistant statement. I would add **`agent_statements`** (array of strings): things the assistant has told the applicant during the session — the same role as `facts`, but for the other side of the conversation.
+- **Turn provenance.** Every item in `facts` / `constraints` / `open_questions` should carry a `source_turn` integer. Without it you cannot tell whether a constraint was stated once or repeated, and you cannot explain a summary that dropped something.
 - **Anything unresolved but not literally a question.** Turn 8's "if I bring the id card on Thursday, will the decision be made the same day?" is an open question, yes — but the underlying *commitment* ("if X, then Y") is neither a fact nor a constraint in the schema's sense. I would add **`commitments`** (array of `{condition, consequence}` objects).
 
-To pay for this, I would drop `topic` (redundant with `facts` — the topic is derivable from any single fact) and merge `decisions` into `agent_statements`. That frees two fields for `agent_statements` and `commitments`, and the schema stays comparable in size.
+To pay for this, I would drop `topic` (redundant with `facts`) and merge `decisions` into `agent_statements`. That frees two fields for `agent_statements` and `commitments`.
 
 ### 4. When is compression the wrong choice?
 
-Compression is wrong whenever the *exact wording* is what matters, not just the content. In this session, the applicant asked (turn 7): *"does a scanned letter from my employer count, or does it have to be the original?"* The state object recorded this as `open_questions: ["What is the exact grant amount for income band 2?"]` — but notice what it *kept* vs what it *dropped*: it dropped turn 7's employer-letter question entirely from `open_questions`, even though it appears in `decisions`. The state also flattened turn 5's *"I could not upload my id card because the scanner at home broke"* into a fact — losing the *reason*, which might matter if the applicant later disputes the missing-document decision.
+Compression is wrong whenever the *exact wording* is what matters, not just the content. In this session, the applicant asked (turn 7): *"does a scanned letter from my employer count, or does it have to be the original?"* The state object dropped turn 7's question entirely from `open_questions`, even though it appears in `decisions`. The state also flattened turn 5's *"I could not upload my id card because the scanner at home broke"* into a fact — losing the *reason*, which might matter if the applicant later disputes the missing-document decision.
 
-A concrete case where compression would be wrong: **a conversation that will be used as evidence in a dispute about what the office promised.** If A-202 is later refused and appeals, saying *"your assistant told me 150,000 on turn 4"*, the compressed state has no way to check that — `facts` only contains what the applicant said, not what the assistant said. Only the raw turn-by-turn history is defensible in that scenario.
+A concrete case where compression would be wrong: **a conversation used as evidence in a dispute about what the office promised.** If A-202 is later refused and appeals, saying *"your assistant told me 150,000 on turn 4"*, the compressed state has no way to check that — `facts` only contains what the applicant said. Only the raw turn-by-turn history is defensible in that scenario.
 
-Would my program notice? **No.** The program validates the summary's *shape*, not its *coverage*. If the model drops a turn, the schema still passes, the history still gets replaced, and the probe still gets answered — with whatever the state happens to contain. The only signal I built in is the probe list, and the probe list was designed to test *this* conversation, not any conversation. A production system would need a second check: after compression, re-ask the same questions against the compressed state and against the raw history, and refuse the compression if the two disagree.
+Would my program notice? **No.** The program validates the summary's *shape*, not its *coverage*. If the model drops a turn, the schema still passes, the history still gets replaced, and the probe still gets answered — with whatever the state happens to contain. A production system would need a second check: after compression, re-ask the same questions against the compressed state and against the raw history, and refuse the compression if the two disagree.
 
-<!--
-TODO: Sublab Hard section will be added here once the extraction, scoring and ranking run is done.
--->
+# Sublab Hard — stories in, CVs out
+
+## Setup
+
+- Model: `google/gemma-4-26b-a4b-it` via OpenRouter. (See the disclosure at the top: Easy and Medium ran on `deepseek/deepseek-v4-flash-0731`; Hard was re-run on gemma after deepseek stalled on network for more than 10 minutes with no response. The extraction rules, the rubric and the counting rules are identical; only the model changed.)
+- Two-stage pipeline:
+  1. **extract** — one call per story, system prompt contains the HARD RULES (null, no estimate, scale conversion, published-only-if-stated, no averaging contradictions, months not jobs).
+  2. **score** — one call per extracted CV, system prompt contains the rubric JSON and the counting rules; the model returns three 0–5 numbers and a one-line reason per criterion, and is explicitly told NOT to compute the weighted total.
+- The weighted total (0.5·academic + 0.3·research + 0.2·experience, rounded to 2 decimals) and the winner are computed in **code**, from the three scores.
+- A separate prose call receives the six `{candidate_id, full_name, model_scores, computed_total, why_each_score}` rows and is asked to name the winner in prose.
+
+## Part 1 — Extraction table
+
+| story | candidate | parsed | validated | null fields | traps hit |
+|-------|-----------|--------|-----------|-------------|-----------|
+| story-01 | Aziza Bekova | yes | yes | — | none |
+| story-02 | Dias Yerzhanov | yes | yes | `gpa_4_scale`, `gpa_original` | no GPA stated, correctly left null |
+| story-03 | Lyazzat Omarova | yes | yes | — | 4.6/5.0 converted to 3.68 on 4.0; "under review" paper recorded as non-published, not counted |
+| story-04 | Tamerlan Saparov | yes | yes | — | 1 published, 1 under review + 2 in preparation, only the 1 counted |
+| story-05 | Аиша Нұрланқызы | yes | yes | — | Kazakh story; "жазылып жатыр" (= in preparation) recorded as non-published |
+| story-06 | Nurzhan Abilov | yes | yes | `graduation_year`, `gpa_4_scale`, `gpa_original`, `relevant_experience_months` | **contradictions recorded, not averaged**: 3.2 vs 3.5 GPA, 2024 vs 2026 graduation; the model also flagged the 40-month experience as impossible and zeroed it (see written answers) |
+
+All six CVs validated against the required schema. Every trap listed in the assignment is caught, with the one caveat on story-06's experience (below).
+
+## Part 2 — Scores and ranking
+
+Scores from the model:
+
+| candidate | academic (0-5) | research (0-5) | experience (0-5) | weighted total (code) |
+|-----------|---------------:|---------------:|-----------------:|----------------------:|
+| Aziza Bekova | 5 | 5 | 0 | **4.0** |
+| Tamerlan Saparov | 4 | 0 | 5 | **3.0** |
+| Аиша Нұрланқызы | 5 | 1 | 1 | **3.0** |
+| Lyazzat Omarova | 4 | 0 | 0 | **2.0** |
+| Dias Yerzhanov | 0 | 0 | 5 | **1.0** |
+| Nurzhan Abilov | 0 | 0 | 0 | **0.0** |
+
+Weighted formula: `0.5·academic + 0.3·research + 0.2·experience`, rounded to 2 decimals. Computed in Python, not by the model.
+
+Ranking (sorted by code):
+
+| rank | candidate_id | full_name | academic | research | experience | total |
+|-----:|--------------|-----------|---------:|---------:|-----------:|------:|
+| 1 | story-01 | Aziza Bekova | 5 | 5 | 0 | 4.0 |
+| 2 | story-04 | Tamerlan Saparov | 4 | 0 | 5 | 3.0 |
+| 3 | story-05 | Аиша Нұрланқызы | 5 | 1 | 1 | 3.0 |
+| 4 | story-03 | Lyazzat Omarova | 4 | 0 | 0 | 2.0 |
+| 5 | story-02 | Dias Yerzhanov | 0 | 0 | 5 | 1.0 |
+| 6 | story-06 | Nurzhan Abilov | 0 | 0 | 0 | 0.0 |
+
+**WINNER (by code): Aziza Bekova, total 4.0.**
+**Gap over runner-up (Tamerlan Saparov): 1.0.**
+Ranks 2 and 3 are tied at 3.0.
+
+Prose ranking (separate call):
+
+> Aziza Bekova should be awarded the single funded place. She holds the highest computed total of 4.0, driven by perfect scores in both the academic and research categories. With a strong 3.8 GPA and two peer-reviewed publications, she demonstrates the high-level theoretical and investigative rigor necessary for a funded position.
+>
+> While other candidates possess specific strengths, they lack the balanced profile of Bekova. Tamerlan Saparov and Dias Yerzhanov offer significant professional experience, but they fall short in research output and academic documentation. Similarly, while Аиша Нұрланқызы shows academic excellence, her research and practical experience are insufficient compared to Bekova's proven track record.
+>
+> Ultimately, Bekova represents the most well-rounded candidate. Her ability to combine top-tier academic performance with established research credentials makes her the most qualified individual to maximize the value of the funding.
+
+The prose agrees with the code on the winner.
+
+## Part 3 — Written answers
+
+### 1. Which rule did you have to add, and what broke without it?
+
+Story-06 forced a rule that the assignment's counting rules did not name explicitly: **"a stated duration in months is countable as stated, even if the number looks round."** The rubric's `counting_rules.experience` says "count months, not jobs. A period with no dates is not countable." It does **not** say what to do when a story gives both a start date (February 2023) and a duration ("about forty months") but the two look like they might not reconcile at a glance.
+
+In this run the model treated February 2023 to "about forty months" as a *contradiction* ("the duration is mathematically impossible") and set `relevant_experience_months` to `0`. That is the wrong call: February 2023 to September 2026 is 43 months, so "40" is a reasonable round-off, not a contradiction. The scoring then gave Nurzhan **experience = 0** on a candidate who has the longest continuous employment of the six.
+
+An earlier run of the same code on a different model gave `40` and Nurzhan scored 1.0 total; this run gives `0` and Nurzhan scores 0.0. That swing is the rule I would add to the prompt verbatim:
+
+> "If the story states a start date and a duration in months, use the duration as stated. Do not recompute the duration and do not flag a mismatch as a contradiction unless the story itself states two different durations."
+
+Without this rule, a reader that trusts the model literally gets one number in one run and a different number the next, on the candidate with the most experience.
+
+### 2. Where did the model guess, and where did your code have to decide?
+
+**Where the model guessed** — story-01, Aziza Bekova. Her only work experience is *"part-time for a data team as a junior analyst… cleaning and documenting a legacy dataset — not research"*. The model classified this as **relevant experience** and gave it a score. In this run it awarded `experience = 0` with the "no months stated" rule in mind; in the earlier run it awarded `1`. The classification of "junior analyst cleaning a dataset" as relevant experience is a judgement call the model made on its own — the story itself says the work "is not research", and the model is not given a definition of what counts as "relevant experience."
+
+**Where my code decided** — the ranked order and the winner. I did not ask the model for the weighted total, and I did not ask it which candidate should win in the JSON call. The code reads three numbers and applies `0.5·a + 0.3·r + 0.2·e`. It also decides the fallback `candidate_id` (the model returned `null` for several stories; the code substitutes the file stem `story-01`, etc.). If I had left the ranking to the model, the tie at rank 2/3 between Tamerlan and Аиша would have been resolved by prose — i.e., by style. The code resolves it by score, and I am free to say in the report that the two are tied.
+
+### 3. Prose ranking vs computed ranking — did they agree?
+
+They agreed. Both name Aziza Bekova as the winner, and both justify it the same way: the 0.5-weight academic criterion dominates, and Aziza is the only candidate with both a strong GPA and two published outputs, so she wins on the criterion that carries half the weight. The prose call also explicitly mentions the two other well-known profiles — Tamerlan (published 1, 24 months) and Аиша (3.9 GPA but non-published second paper) — and ranks them below Aziza for the same reasons the code does.
+
+**If they had disagreed**, I would trust the code. Reason: the code's ranking is a pure function of three inputs that I can audit, and the same three numbers reproduce the same ranking every time. The prose ranking is a single sample from a stochastic process — a second call could phrase a different winner without any of the inputs changing. This is the *whole point* of the assignment's split: a number in a sentence is not a number a program can compare.
+
+To trust the prose ranking on its own, I would want to see: (a) the same winner named across 5–10 identical calls at temperature 0, (b) the losing candidates' reasoning to be consistent across calls, and (c) the prose to explicitly cite the same three criterion scores the code uses. Short of that, prose is a comment on the ranking, not the ranking.
+
+### 4. Rubric anchor for a contradicted field
+
+The rubric says what a 0 means and what a 5 means; it does not say what to do when the story says 3.2 and then 3.5. I followed the assignment's counting rule literally: **the field is null, the contradiction is recorded, and the value is not averaged.** For story-06, `gpa_4_scale` is `null`, `gpa_original` is `null`, and `contradictions` contains `"GPA: candidate states 3.2 but then suggests it might be 3.5"`. The scorer then gave Nurzhan `academic = 0`, which is the rubric's honest reading of "no GPA in the CV, academic is 0."
+
+**What I think the rule should be** — this is where I disagree with the current schema. Contradiction is not the same kind of event as absence. "No GPA" means the applicant chose not to give one; "two GPAs" means the applicant gave two. Collapsing both to `null` loses that difference. I would add a fourth scoring tier to the rubric, anchored explicitly:
+
+> **1 (contradiction)** — the story states a value but contradicts itself. This is not 0 (no information) and not 3 (average of the two values). It is a lower score than either stated value would have earned, because a funded decision cannot be made on an unstable input.
+
+That would make Nurzhan's academic `1` rather than `0`, which correctly separates "Nurzhan gave two numbers and can be asked which is right" from "Dias deliberately gave no number." As written, the rubric treats those two candidates identically on the academic criterion, and they are not the same case.
+
+### 5. The top two candidates
+
+**Aziza Bekova (4.0) and Tamerlan Saparov (3.0), gap 1.0.** Not within 0.05, so the top of the ranking is not marginal. This was also true in the earlier run (Aziza 4.2, Tamerlan 3.0, gap 1.2). Across two runs on two different models, Aziza is rank 1 and Tamerlan is rank 2, with a gap of at least 1.0 every time. That is as close to a stable call as six short stories allow.
+
+**The interesting marginal call is lower down: rank 2 vs rank 3, Tamerlan (3.0) and Аиша (3.0), gap 0.0.** They are exactly tied. Their profiles are opposite: Tamerlan wins on experience (5 vs 1) and loses on research (0 vs 1); Аиша wins on academic (5 vs 4) and research, loses on experience. Because the academic weight is 0.5 and the experience weight is 0.2, the two paths happen to land on the same total. That is not a coincidence of this run — it is exactly the trade-off the rubric's weights create.
+
+**If the top two had been within 0.05**, I would tell the committee three things. First, that the ranking is a statistical tie: with scores that are stable to plus/minus 1 on a 0–5 scale, anything under 0.05 is inside the model's own noise, not a real difference. Second, that the two candidates should be invited to a short interview instead of being decided by a score. Third, that the extraction should be re-run with a **stricter evidence rule**: require the extractor to return the exact quote for every scored field, and refuse any score whose evidence quote does not contain the value being scored. That is the change I would make to the extraction pipeline before I would trust a sub-0.05 gap — not a change to the model, and not a change to the weights.
+
+For this run, no action is needed at the top. The gap is 1.0 and both models agree on the winner. The tie to flag is rank 2/3, and the committee should see that as a tie, not as "Tamerlan beat Аиша by 0.0."
