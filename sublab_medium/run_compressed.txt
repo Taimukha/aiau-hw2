@@ -1,0 +1,70 @@
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/runpy.py", line 197, in _run_module_as_main
+    return _run_code(code, main_globals, None,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/runpy.py", line 87, in _run_code
+    exec(code, run_globals)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/sublab_medium/chat_memory.py", line 237, in <module>
+    main()
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/sublab_medium/chat_memory.py", line 233, in main
+    run_scripted(compress_enabled=not args.no_compress)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/sublab_medium/chat_memory.py", line 135, in run_scripted
+    reply, tokens = call_model(messages)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/sublab_medium/chat_memory.py", line 81, in call_model
+    resp = client.chat.completions.create(**kwargs)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/openai/_utils/_utils.py", line 298, in wrapper
+    return func(*args, **kwargs)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/openai/resources/chat/completions/completions.py", line 1284, in create
+    return self._post(
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/openai/_base_client.py", line 1360, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/openai/_base_client.py", line 1065, in request
+    response = self._send_request(
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/openai/_client.py", line 483, in _send_request
+    response = self._send_with_auth_retry(request, stream=stream, **kwargs)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/openai/_client.py", line 461, in _send_with_auth_retry
+    response = super()._send_request(request, stream=stream, **kwargs)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/openai/_base_client.py", line 990, in _send_request
+    return self._client.send(request, stream=stream, **kwargs)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpx/_client.py", line 928, in send
+    raise exc
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpx/_client.py", line 922, in send
+    response.read()
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpx/_models.py", line 881, in read
+    self._content = b"".join(self.iter_bytes())
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpx/_models.py", line 897, in iter_bytes
+    for raw_bytes in self.iter_raw():
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpx/_models.py", line 951, in iter_raw
+    for raw_stream_bytes in self.stream:
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpx/_client.py", line 153, in __iter__
+    for chunk in self._stream:
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpx/_transports/default.py", line 127, in __iter__
+    for part in self._httpcore_stream:
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpcore/_sync/connection_pool.py", line 407, in __iter__
+    raise exc from None
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpcore/_sync/connection_pool.py", line 403, in __iter__
+    for part in self._stream:
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpcore/_sync/http11.py", line 342, in __iter__
+    raise exc
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpcore/_sync/http11.py", line 334, in __iter__
+    for chunk in self._connection._receive_response_body(**kwargs):
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpcore/_sync/http11.py", line 203, in _receive_response_body
+    event = self._receive_event(timeout=timeout)
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpcore/_sync/http11.py", line 217, in _receive_event
+    data = self._network_stream.read(
+  File "/Users/aiaulymtaimukha/Desktop/aiau-hw2/.venv/lib/python3.9/site-packages/httpcore/_backends/sync.py", line 128, in read
+    return self._sock.recv(max_bytes)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1226, in recv
+    return self.read(buflen)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1101, in read
+    return self._sslobj.read(len)
+KeyboardInterrupt
+
+======================================================================
+=== Run: COMPRESSED ===
+======================================================================
+model = deepseek/deepseek-v4-flash-0731
+base_url = https://openrouter.ai/api/v1
+
+[turn 1] tokens_sent = 144
+[turn 2] tokens_sent = 184
+[turn 3] tokens_sent = 239
